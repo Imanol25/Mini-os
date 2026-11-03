@@ -45,12 +45,10 @@ void registrar_bitacora(const char *accion) {
     }
 }
 
-// Inicializa el directorio base ~/miniSO/disk/
 void inicializar_entorno() {
     const char *homedir = getenv("HOME");
-    if (homedir == NULL) {
-        homedir = getpwuid(getuid())->pw_dir;
-    }
+    if (homedir == NULL) homedir = getpwuid(getuid())->pw_dir;
+    
     snprintf(BASE_DIR, sizeof(BASE_DIR), "%s/miniSO/disk", homedir);
     snprintf(LOG_FILE, sizeof(LOG_FILE), "%s/miniSO/bitacora.log", homedir);
 
@@ -61,14 +59,12 @@ void inicializar_entorno() {
     registrar_bitacora("Sistema iniciado");
 }
 
-// Verifica que la ruta no salga de ~/miniSO/disk/ (Aislamiento)
 int es_ruta_segura(const char *ruta_relativa, char *ruta_absoluta) {
-    char temp[PATH_MAX + 512]; // Tamaño aumentado para evitar -Wformat-truncation
+    char temp[PATH_MAX + 512]; 
     snprintf(temp, sizeof(temp), "%s/%s", BASE_DIR, ruta_relativa);
     
     char *res = realpath(temp, ruta_absoluta);
     if (res == NULL) {
-        // Si el archivo no existe (ej. para crear uno nuevo), validamos el directorio padre
         strncpy(ruta_absoluta, temp, PATH_MAX);
         return strstr(ruta_absoluta, BASE_DIR) == ruta_absoluta;
     }
@@ -94,13 +90,10 @@ void leerCadena(const char *mensaje, char *cadena, int tamano) {
    ===================================================== */
 void listar_archivos() {
     DIR *dir = opendir(BASE_DIR);
-    if (!dir) {
-        perror("Error abriendo directorio");
-        return;
-    }
+    if (!dir) { perror("Error abriendo directorio"); return; }
     struct dirent *entrada;
     struct stat st;
-    char ruta[PATH_MAX + 512]; // Tamaño aumentado para evitar -Wformat-truncation
+    char ruta[PATH_MAX + 512]; 
     
     printf("\n--- CONTENIDO DE %s ---\n", BASE_DIR);
     printf("%-20s %-10s %-10s %-10s %s\n", "Nombre", "Tipo", "Size(B)", "Permisos", "Modificacion");
@@ -108,18 +101,13 @@ void listar_archivos() {
     
     while ((entrada = readdir(dir)) != NULL) {
         if (strcmp(entrada->d_name, ".") == 0 || strcmp(entrada->d_name, "..") == 0) continue;
-        
         snprintf(ruta, sizeof(ruta), "%s/%s", BASE_DIR, entrada->d_name);
         if (stat(ruta, &st) == 0) {
             char mod_time[64];
             strftime(mod_time, sizeof(mod_time), "%Y-%m-%d %H:%M", localtime(&st.st_mtime));
-            
             printf("%-20s %-10s %-10ld %-10o %s\n", 
-                   entrada->d_name, 
-                   S_ISDIR(st.st_mode) ? "Dir" : "Archivo",
-                   (long)st.st_size, 
-                   st.st_mode & 0777, 
-                   mod_time);
+                   entrada->d_name, S_ISDIR(st.st_mode) ? "Dir" : "Archivo",
+                   (long)st.st_size, st.st_mode & 0777, mod_time);
         }
     }
     closedir(dir);
@@ -129,22 +117,14 @@ void listar_archivos() {
 void crear_archivo_texto() {
     char nombre[256], contenido[BUFFER_SIZE], ruta[PATH_MAX];
     leerCadena("Nombre del archivo: ", nombre, sizeof(nombre));
-    
-    if (!es_ruta_segura(nombre, ruta)) {
-        printf("Error: Violación de seguridad (ruta inválida).\n");
-        return;
-    }
+    if (!es_ruta_segura(nombre, ruta)) return;
 
     int fd = open(ruta, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    if (fd == -1) {
-        perror("Error al crear archivo");
-        return;
-    }
+    if (fd == -1) { perror("Error al crear archivo"); return; }
 
     leerCadena("Ingrese el contenido: ", contenido, sizeof(contenido));
     if (write(fd, contenido, strlen(contenido)) == -1) perror("Error escribiendo");
     else printf("Archivo '%s' creado.\n", nombre);
-    
     close(fd);
     registrar_bitacora("Creó archivo de texto");
 }
@@ -153,7 +133,6 @@ void crear_directorio() {
     char nombre[256], ruta[PATH_MAX];
     leerCadena("Nombre del directorio: ", nombre, sizeof(nombre));
     if (!es_ruta_segura(nombre, ruta)) return;
-
     if (mkdir(ruta, 0755) == -1) perror("Error creando directorio");
     else printf("Directorio creado exitosamente.\n");
     registrar_bitacora("Creó directorio");
@@ -165,28 +144,18 @@ void leer_archivo() {
     if (!es_ruta_segura(nombre, ruta)) return;
 
     struct stat st;
-    if (stat(ruta, &st) == -1) {
-        perror("Error accediendo al archivo");
-        return;
-    }
+    if (stat(ruta, &st) == -1) { perror("Error accediendo al archivo"); return; }
 
     int fd = open(ruta, O_RDONLY);
-    if (fd == -1) {
-        perror("Error abriendo archivo");
-        return;
-    }
+    if (fd == -1) { perror("Error abriendo archivo"); return; }
 
-    // Heurística simple para determinar si es texto
     char buf[64];
     int n = read(fd, buf, 64);
     int es_texto = 1;
     for(int i=0; i<n; i++) {
-        if (!isprint(buf[i]) && buf[i] != '\n' && buf[i] != '\r' && buf[i] != '\t') {
-            es_texto = 0; break;
-        }
+        if (!isprint(buf[i]) && buf[i] != '\n' && buf[i] != '\r' && buf[i] != '\t') { es_texto = 0; break; }
     }
-
-    lseek(fd, 0, SEEK_SET); // Rebobinar
+    lseek(fd, 0, SEEK_SET);
 
     printf("\n--- LEYENDO ARCHIVO ---\n");
     if (es_texto) {
@@ -197,8 +166,7 @@ void leer_archivo() {
             printf("%s", buffer);
         }
     } else {
-        printf("Metadatos - Tamaño: %ld bytes\n", (long)st.st_size);
-        printf("Primeros 64 bytes (Hex):\n");
+        printf("Metadatos - Tamaño: %ld bytes\nPrimeros 64 bytes (Hex):\n", (long)st.st_size);
         char hexbuf[64];
         ssize_t bytes = read(fd, hexbuf, 64);
         for (int i = 0; i < bytes; i++) {
@@ -209,6 +177,28 @@ void leer_archivo() {
     }
     close(fd);
     registrar_bitacora("Leyó archivo");
+}
+
+void editar_archivo_texto() {
+    char nombre[256], ruta[PATH_MAX + 512], contenido[BUFFER_SIZE];
+    leerCadena("Archivo a editar: ", nombre, sizeof(nombre));
+    if (!es_ruta_segura(nombre, ruta)) return;
+
+    int modo = leerEntero("1. Agregar al final\n2. Sobrescribir por completo\nOpcion: ");
+    int flags = O_WRONLY;
+    if (modo == 1) flags |= O_APPEND;
+    else if (modo == 2) flags |= O_TRUNC;
+    else { printf("Opcion invalida.\n"); return; }
+
+    int fd = open(ruta, flags);
+    if (fd == -1) { perror("Error abriendo archivo"); return; }
+
+    leerCadena("Ingrese el contenido: ", contenido, sizeof(contenido));
+    write(fd, contenido, strlen(contenido));
+    write(fd, "\n", 1);
+    printf("Archivo actualizado.\n");
+    close(fd);
+    registrar_bitacora("Editó archivo de texto");
 }
 
 void copiar_archivo() {
@@ -228,21 +218,14 @@ void copiar_archivo() {
     ssize_t bytes_leidos, bytes_escritos;
     while ((bytes_leidos = read(fd_in, buffer, BUFFER_SIZE)) > 0) {
         bytes_escritos = write(fd_out, buffer, bytes_leidos);
-        if (bytes_escritos != bytes_leidos) {
-            perror("Error de escritura"); break;
-        }
+        if (bytes_escritos != bytes_leidos) { perror("Error de escritura"); break; }
     }
-    
     struct stat st_in, st_out;
     fstat(fd_in, &st_in); fstat(fd_out, &st_out);
-    
     close(fd_in); close(fd_out);
 
-    if (st_in.st_size == st_out.st_size) {
-        printf("Copia exitosa. Integridad verificada (%ld bytes).\n", (long)st_in.st_size);
-    } else {
-        printf("ADVERTENCIA: La copia difiere en tamaño.\n");
-    }
+    if (st_in.st_size == st_out.st_size) printf("Copia exitosa. Integridad verificada (%ld bytes).\n", (long)st_in.st_size);
+    else printf("ADVERTENCIA: La copia difiere en tamaño.\n");
     registrar_bitacora("Copió archivo");
 }
 
@@ -258,6 +241,44 @@ void mover_renombrar() {
     registrar_bitacora("Movió/Renombró archivo");
 }
 
+void cambiar_permisos() {
+    char nombre[256], ruta[PATH_MAX + 512], perm_str[10];
+    leerCadena("Archivo/Directorio a modificar: ", nombre, sizeof(nombre));
+    if (!es_ruta_segura(nombre, ruta)) return;
+
+    leerCadena("Nuevos permisos en octal (ej. 755, 644): ", perm_str, sizeof(perm_str));
+    long permisos = strtol(perm_str, NULL, 8); 
+
+    if (chmod(ruta, permisos) == -1) perror("Error al cambiar permisos");
+    else {
+        printf("Permisos actualizados correctamente.\n");
+        registrar_bitacora("Cambió permisos de archivo");
+    }
+}
+
+void buscar_archivos() {
+    char termino[256];
+    leerCadena("Buscar (nombre o extensión): ", termino, sizeof(termino));
+
+    DIR *dir = opendir(BASE_DIR);
+    if (!dir) { perror("Error abriendo directorio"); return; }
+    
+    struct dirent *entrada;
+    int encontrados = 0;
+    
+    printf("\n--- RESULTADOS DE BUSQUEDA ---\n");
+    while ((entrada = readdir(dir)) != NULL) {
+        if (strstr(entrada->d_name, termino) != NULL) {
+            printf("- %s\n", entrada->d_name);
+            encontrados++;
+        }
+    }
+    closedir(dir);
+    
+    if (encontrados == 0) printf("No se encontraron coincidencias.\n");
+    registrar_bitacora("Buscó archivos");
+}
+
 void eliminar_archivo_directorio() {
     char nombre[256], ruta[PATH_MAX];
     leerCadena("Archivo/Directorio a eliminar: ", nombre, sizeof(nombre));
@@ -268,9 +289,7 @@ void eliminar_archivo_directorio() {
 
     char conf[10];
     leerCadena("¿Seguro que desea eliminar? (s/n): ", conf, sizeof(conf));
-    if (conf[0] != 's' && conf[0] != 'S') {
-        printf("Operación cancelada.\n"); return;
-    }
+    if (conf[0] != 's' && conf[0] != 'S') { printf("Operación cancelada.\n"); return; }
 
     if (S_ISDIR(st.st_mode)) {
         if (rmdir(ruta) == -1) perror("Error al eliminar directorio (¿está vacío?)");
@@ -292,9 +311,12 @@ void menu_gestor_archivos() {
         printf("2. Crear archivo de texto\n");
         printf("3. Crear directorio\n");
         printf("4. Leer archivo\n");
-        printf("5. Copiar archivo (con integridad)\n");
-        printf("6. Renombrar o Mover\n");
-        printf("7. Eliminar archivo/directorio\n");
+        printf("5. Editar archivo de texto\n");
+        printf("6. Copiar archivo (con integridad)\n");
+        printf("7. Renombrar o Mover\n");
+        printf("8. Cambiar permisos de un archivo\n");
+        printf("9. Buscar archivos por nombre o extension\n");
+        printf("10. Eliminar archivo/directorio\n");
         printf("11. Volver al menu principal\n");
         
         opcion = leerEntero("\nOpcion: ");
@@ -303,9 +325,12 @@ void menu_gestor_archivos() {
             case 2: crear_archivo_texto(); pausar(); break;
             case 3: crear_directorio(); pausar(); break;
             case 4: leer_archivo(); pausar(); break;
-            case 5: copiar_archivo(); pausar(); break;
-            case 6: mover_renombrar(); pausar(); break;
-            case 7: eliminar_archivo_directorio(); pausar(); break;
+            case 5: editar_archivo_texto(); pausar(); break;
+            case 6: copiar_archivo(); pausar(); break;
+            case 7: mover_renombrar(); pausar(); break;
+            case 8: cambiar_permisos(); pausar(); break;
+            case 9: buscar_archivos(); pausar(); break;
+            case 10: eliminar_archivo_directorio(); pausar(); break;
             case 11: break;
             default: printf("Opcion invalida.\n"); pausar(); break;
         }
@@ -335,38 +360,27 @@ void ejecutar_juego(const char *comando) {
     tcgetattr(STDIN_FILENO, &terminal_original);
 
     time_t inicio = time(NULL);
-    
     pid_t pid = fork(); 
-    if (pid == -1) {
-        perror("Error en fork()");
-        return;
-    } else if (pid == 0) {
-        // PROCESO HIJO
+    if (pid == -1) { perror("Error en fork()"); return; } 
+    else if (pid == 0) {
         signal(SIGINT, SIG_DFL); 
         char *args[] = {(char *)comando, NULL};
         execv(ruta, args);
         perror("Fallo execv");
         _exit(127); 
     } else {
-        // PROCESO PADRE
         signal(SIGINT, SIG_IGN); 
         int status;
         waitpid(pid, &status, 0); 
-        
-        // Restaurar estado
         tcsetattr(STDIN_FILENO, TCSANOW, &terminal_original);
         signal(SIGINT, SIG_DFL);
-        
         time_t fin = time(NULL);
         double duracion = difftime(fin, inicio);
 
         printf("\n--- INFORME DE PARTIDA ---\n");
         printf("PID del hijo: %d\n", pid);
-        if (WIFEXITED(status)) {
-            printf("Terminacion: Normal (Codigo %d)\n", WEXITSTATUS(status));
-        } else if (WIFSIGNALED(status)) {
-            printf("Terminacion: Por Señal (Señal %d)\n", WTERMSIG(status));
-        }
+        if (WIFEXITED(status)) printf("Terminacion: Normal (Codigo %d)\n", WEXITSTATUS(status));
+        else if (WIFSIGNALED(status)) printf("Terminacion: Por Señal (Señal %d)\n", WTERMSIG(status));
         printf("Duracion: %.0f segundos\n", duracion);
         
         char log_msg[256];
