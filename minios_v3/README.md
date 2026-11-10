@@ -1,4 +1,9 @@
 # MiniOS v3.0
+## Credenciales de Acceso por Defecto
+Para ingresar al sistema, utilice cualquiera de los siguientes usuarios. Se recomienda usar la opción "Cambiar Clave" (Opción 15) tras el primer inicio de sesión:
+- **Administrador:** usuario: `admin` | clave: `admin123`
+- **Operador:** usuario: `operador` | clave: `oper123`
+- **Invitado:** usuario: `invitado` | clave: `inv123`
 
 ## 1. Integrantes y Compilación
 - Compilar: Ejecutar `make` en la terminal (automatiza la compilación con gcc -Wall -Wextra).
