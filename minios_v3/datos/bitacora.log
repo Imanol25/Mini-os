@@ -1,0 +1,6 @@
+2026-11-10 15:01:25 | -          | -        | ARRANQUE       | sistema    | OK
+2026-11-10 15:01:51 | -          | -        | LOGIN          | Juanes     | LOGIN FALLIDO
+2026-11-10 15:02:03 | admin      | admin    | LOGIN          | admin      | LOGIN EXITOSO
+2026-11-10 15:03:03 | admin      | admin    | DERECHO_01     | registros  | PERMITIDO
+2026-11-10 15:03:26 | admin      | admin    | DERECHO_02     | registros  | PERMITIDO
+2026-11-10 15:03:36 | admin      | admin    | LOGOUT         | admin      | OK

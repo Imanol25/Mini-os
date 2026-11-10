@@ -31,3 +31,12 @@ Este sistema se asemeja a un Sistema de **Tiempo Compartido e Interactivo (ej. U
 - **Separación de Privilegios:** Solo el rol de Administrador tiene acceso al derecho EXECUTE sobre el Sistema (Apagar).
 - **Mínimo Privilegio:** El invitado puede acceder a Juegos y listar procesos, pero se le restringe cualquier modificación o almacenamiento.
 - **Fallo Seguro:** Si el usuario no tiene los bits requeridos en la matriz de acceso, la operación se deniega por defecto protegiendo el sistema.
+## 6. Virtualización
+- **Hipervisor detectado:** Tipo 2 (Alojado) como VirtualBox o VMware.
+- **Implementación:** Asistida por Hardware (VT-x / AMD-V) para aceleración. 
+- **Diferencia anfitrión/VM:** En la VM, comandos como grep 'vmx' varían si el hipervisor oculta la bandera de virtualización anidada. Los contenedores (Docker) comparten el Kernel, las VM virtualizan hardware completo.
+
+## 7. Mejoras de la Versión Final (Parte 2)
+- **Autoguardado con Mutex:** Previene condiciones de carrera. Sin `pthread_mutex`, el hilo de guardado podría capturar variables a medias (ej. posición X vieja y Y nueva) mientras el jugador se mueve, corrompiendo la partida guardada.
+- **RAID 1 (Disco Espejo):** `fs.c` escribe bidireccionalmente. Si se elimina `minios.disk`, se reconstruye automáticamente desde `minios_espejo.disk`.
+- **Monitor de Memoria:** `proc.c` extrae en tiempo real la paginación y huella de RAM (VmSize/VmRSS) de cada proceso en `/proc/<pid>/status`.

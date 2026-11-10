@@ -10,7 +10,6 @@ typedef struct {
     Estado estado;
     time_t inicio;
 } PCB;
-
 void proc_lanzar(const char *programa);
 void proc_listar(void);
 void proc_reanudar(void);
