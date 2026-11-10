@@ -1,83 +1,66 @@
-#include <stdio.h>
-#include <string.h>
-#include <signal.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include "proc.h"
-#include "seguridad.h"
-#include "kernel.h"
+#include "../include/minios.h"
 
-#define MAX_PROC 10
-static PCB tabla_proc[MAX_PROC];
-static int total_proc = 0;
+Proceso *lista_procesos = NULL;
 
-static void esperar_hijo(PCB *p) {
-    int st; waitpid(p->pid, &st, WUNTRACED);
-    p->estado = WIFSTOPPED(st) ? SUSPENDIDO : TERMINADO;
+void proc_init() {
+    signal(SIGTSTP, SIG_IGN); 
 }
 
-void proc_lanzar(const char *programa) {
-    if (total_proc >= MAX_PROC) return;
-    signal(SIGTSTP, SIG_IGN); signal(SIGINT, SIG_IGN);
-    pid_t pid = fork();
-    if (pid == 0) {
-        signal(SIGTSTP, SIG_DFL); signal(SIGINT, SIG_DFL);
-        execlp(programa, programa, (char *)NULL);
-        perror("exec"); _exit(127);
-    }
-    PCB *p = &tabla_proc[total_proc++]; p->pid = pid;
-    strncpy(p->nombre, programa, sizeof p->nombre - 1);
-    strncpy(p->usuario, seg_usuario_actual(), sizeof p->usuario - 1);
-    p->estado = EJECUTANDO; p->inicio = time(NULL);
-    esperar_hijo(p); signal(SIGINT, SIG_DFL);
+void proc_crear(int pid) {
+    Proceso *p = (Proceso *)malloc(sizeof(Proceso));
+    p->pid = pid;
+    p->usuario = usuario_actual;
+    p->inicio = time(NULL); 
+    p->estado = 0; 
+    p->sig = lista_procesos;
+    lista_procesos = p;
 }
 
-void memoria_proceso(pid_t pid) {
-    char ruta[64], linea[128];
-    snprintf(ruta, sizeof ruta, "/proc/%d/status", pid);
-    FILE *f = fopen(ruta, "r"); if (!f) return;
-    while (fgets(linea, sizeof linea, f)) {
-        if (strncmp(linea, "VmSize", 6) == 0 || strncmp(linea, "VmRSS", 5) == 0) {
-            linea[strcspn(linea, "\n")] = '\0';
-            printf(" [%s]", linea);
-        }
-    }
-    fclose(f);
-}
-
-void proc_listar(void) {
-    printf("\n--- TABLA DE PROCESOS ---\n");
-    for(int i=0; i<total_proc; i++) {
-        printf("PID: %d | Proc: %s | User: %s | Estado: %s", 
-            tabla_proc[i].pid, tabla_proc[i].nombre, tabla_proc[i].usuario,
-            tabla_proc[i].estado == SUSPENDIDO ? "SUSPENDIDO" : "TERMINADO");
-        if (tabla_proc[i].estado != TERMINADO) memoria_proceso(tabla_proc[i].pid);
-        printf("\n");
-    }
-    printf("Tamaño de página del SO: %ld bytes\n", sysconf(_SC_PAGESIZE));
-}
-
-void proc_reanudar(void) {
-    int pid = leer_entero("PID a reanudar: ");
-    for(int i=0; i<total_proc; i++) {
-        if(tabla_proc[i].pid == pid && tabla_proc[i].estado == SUSPENDIDO) {
-            signal(SIGINT, SIG_IGN); kill(pid, SIGCONT);
-            tabla_proc[i].estado = EJECUTANDO; esperar_hijo(&tabla_proc[i]);
-            signal(SIGINT, SIG_DFL);
-        }
+void proc_listar() {
+    printf("\n--- Lista de Procesos Activos ---\n");
+    Proceso *p = lista_procesos;
+    while (p) {
+        char buffer_hora[26];
+        ctime_r(&p->inicio, buffer_hora);
+        buffer_hora[24] = '\0'; 
+        
+        printf("PID: %d | Dueño: %s | Estado: %s | Inicio: %s\n", 
+               p->pid, p->usuario == ROL_ADMIN ? "Admin" : "Invitado", 
+               p->estado == 0 ? "Ejecutando" : "Suspendido", buffer_hora);
+        p = p->sig;
     }
 }
 
-void proc_terminar(void) {
-    int pid = leer_entero("PID a terminar: ");
-    for(int i=0; i<total_proc; i++) {
-        if(tabla_proc[i].pid == pid) {
-            if(seg_obtener_rol() == ROL_OPERADOR && strcmp(tabla_proc[i].usuario, seg_usuario_actual()) != 0) {
-                printf("Propiedad denegada.\n"); return;
+void proc_suspender(int pid) {
+    Proceso *p = lista_procesos;
+    while (p) {
+        if (p->pid == pid) {
+            if (p->usuario != usuario_actual && usuario_actual != ROL_ADMIN) {
+                printf("Error: No tienes permisos.\n");
+                return;
             }
-            kill(pid, SIGTERM); kill(pid, SIGCONT);
-            int st; waitpid(pid, &st, 0);
-            tabla_proc[i].estado = TERMINADO; printf("Proceso finalizado.\n");
+            p->estado = 1;
+            printf("Proceso %d suspendido.\n", pid);
+            return;
         }
+        p = p->sig;
     }
+    printf("Proceso no encontrado.\n");
+}
+
+void proc_reanudar(int pid) {
+    Proceso *p = lista_procesos;
+    while (p) {
+        if (p->pid == pid) {
+            if (p->usuario != usuario_actual && usuario_actual != ROL_ADMIN) {
+                printf("Error: No tienes permisos.\n");
+                return;
+            }
+            p->estado = 0;
+            printf("Proceso %d reanudado.\n", pid);
+            return;
+        }
+        p = p->sig;
+    }
+    printf("Proceso no encontrado.\n");
 }
