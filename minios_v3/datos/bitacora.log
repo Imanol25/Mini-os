@@ -4,3 +4,7 @@
 2026-11-10 15:03:03 | admin      | admin    | DERECHO_01     | registros  | PERMITIDO
 2026-11-10 15:03:26 | admin      | admin    | DERECHO_02     | registros  | PERMITIDO
 2026-11-10 15:03:36 | admin      | admin    | LOGOUT         | admin      | OK
+2026-11-10 15:20:40 | -          | -        | ARRANQUE       | sistema    | OK
+2026-11-10 15:20:52 | admin      | admin    | LOGIN          | admin      | LOGIN EXITOSO
+2026-11-10 15:22:21 | admin      | admin    | DERECHO_10     | sistema    | PERMITIDO
+2026-11-10 15:22:21 | admin      | admin    | APAGADO        | sistema    | OK
